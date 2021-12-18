@@ -1,2 +1,2 @@
-# spend-dashboard
+# safegraph-spend-dashboard
 Dashboard for SafeGraph Spend Data
