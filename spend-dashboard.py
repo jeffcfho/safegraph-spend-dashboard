@@ -3,6 +3,8 @@ import pandas as pd
 import snowflake.connector
 import plotly.express as px
 
+QUERY_CACHE_TTL =  3600 #1 hour
+
 st.sidebar.markdown(
 """ 
 # SafeGraph Spend by brand :credit_card: 
@@ -25,7 +27,7 @@ conn = init_connection()
 
 # Perform query.
 # Uses st.cache to only rerun when the query changes
-@st.cache(hash_funcs={"_thread.lock": lambda _: None})
+@st.cache(ttl=QUERY_CACHE_TTL, hash_funcs={"_thread.lock": lambda _: None})
 def get_safegraph_data_from_snowflake(query):
     return pd.read_sql(query, conn)
 
@@ -38,7 +40,7 @@ def populate_brands_list():
     WHERE date_range_start BETWEEN '2021-09-01' AND '2021-10-01'
     ORDER BY brands
     '''
-    return get_safegraph_data_from_snowflake(brand_query)
+    return pd.read_sql(brand_query, conn)
 
 # Sidebar options
 brands = populate_brands_list()
