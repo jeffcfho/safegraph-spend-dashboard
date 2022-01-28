@@ -3,7 +3,7 @@ import pandas as pd
 import snowflake.connector
 import plotly.express as px
 
-QUERY_CACHE_TTL =  3600 #1 hour
+QUERY_CACHE_TTL =  1800 #0.5 hours
 
 st.sidebar.markdown(
 """ 
