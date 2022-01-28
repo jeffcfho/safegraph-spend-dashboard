@@ -35,7 +35,7 @@ def get_safegraph_data_from_snowflake(query):
 @st.cache(hash_funcs={"_thread.lock": lambda _: None})
 def populate_brands_list():
     brand_query = f'''
-    SELECT DISTINCT brands
+    SELECT DISTINCT brands, safegraph_brand_ids
     FROM SG_SPEND_CORE.PUBLIC.CORE_POI_SPEND
     WHERE date_range_start BETWEEN '2021-09-01' AND '2021-10-01'
     ORDER BY brands
@@ -45,6 +45,7 @@ def populate_brands_list():
 # Sidebar options
 brands = populate_brands_list()
 brand_option = st.sidebar.selectbox('Select a SafeGraph brand', brands)
+brand_option_id = brands.loc[brands["BRANDS"]==brand_option,"SAFEGRAPH_BRAND_IDS"].values[0]
 
 # Main app body
 
@@ -53,6 +54,8 @@ q_coverage = f'''
 WITH core AS (
   SELECT *
   FROM SG_CORE_PLACES_US.PUBLIC.CORE_POI
+  WHERE closed_on IS NULL 
+  OR closed_on >= '2021-09'
 ),
 patterns AS (
   SELECT *
@@ -71,7 +74,7 @@ SELECT
 FROM 
 (core LEFT JOIN patterns ON core.placekey = patterns.placekey)
 LEFT JOIN spend ON core.placekey = spend.placekey
-WHERE core.brands LIKE '%{brand_option.replace("'","''")}%'
+WHERE core.safegraph_brand_ids LIKE '%{brand_option_id}%'
 '''
 coverage_df = get_safegraph_data_from_snowflake(q_coverage)
 coverage_df = coverage_df.transpose().rename({0:'Number'},axis=1)
@@ -82,14 +85,15 @@ q_data = f'''
 SELECT *
 FROM SG_SPEND_CORE.PUBLIC.CORE_POI_SPEND
 WHERE date_range_start BETWEEN '2021-09-01' AND '2021-10-01'
-AND brands LIKE '%{brand_option.replace("'","''")}%'
+AND (closed_on IS NULL OR closed_on >= '2021-09') //Until we fix the spend to closed POI problem
+AND safegraph_brand_ids LIKE '%{brand_option_id}%'
 '''
 df = get_safegraph_data_from_snowflake(q_data)
 
 # High level stats
-st.markdown(f"There are **{len(df)}** POIs with the brand **{brand_option}**  in Spend in Sept 2021. (`BRANDS LIKE '%{brand_option}%'`)")
+st.markdown(f"There are **{len(df)}** non-closed POIs with the brand **{brand_option}**  in Spend in Sept 2021. (`SAFEGRAPH_BRAND_IDS LIKE '%{brand_option_id}%'`)")
 st.markdown(f'''
-    This is **{100*coverage_df.loc['SPEND_PLACEKEYS','Coverage']:.0f}%** of {brand_option} POIs in Core
+    This is **{100*coverage_df.loc['SPEND_PLACEKEYS','Coverage']:.0f}%** of {brand_option} non-closed POIs in Core
     (By comparison, there are **{100*coverage_df.loc['PATTERNS_PLACEKEYS','Coverage']:.0f}%** with Patterns).
     ''')
 st.write(coverage_df)
